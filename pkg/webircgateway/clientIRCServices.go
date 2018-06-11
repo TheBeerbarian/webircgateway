@@ -4,14 +4,16 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strings"
 
+	"github.com/gorilla/securecookie"
 	"github.com/thebeerbarian/webircgateway/pkg/ircservices"
 )
 
 // Struct ircservices contains all fields for
 var (
 	 Atheme       *atheme.Atheme
+	 nsCookieName     = "IRCSERVICEAUTH"
+	 nsCookieHashKey  = []byte("MY_IRCSERVICEAUTH_HASH_KEY")
 	 DEBUG	=     1
 	 INFO	=     2
 	 WARN	=     3
@@ -35,33 +37,88 @@ func ircservicesHTTPHandler(router *http.ServeMux) {
 }
 
 func ircservicesCommand(w http.ResponseWriter, r *http.Request) {
-	var err error
-	if err := r.ParseForm(); err != nil {
+	var (
+	        err error
+		authcookie = "*"
+		account    = ""
+		ipaddr     = r.Header.Get("X-Forwarded-For") //TODO: may not be proxied. Need fallback.
+	        s          = securecookie.New(nsCookieHashKey, nil)
+	)
+
+        if err := r.ParseForm(); err != nil {
 	        http.Error(w, "Error reading POST form data", http.StatusInternalServerError)
 		return
 	}
-	
-	nick := strings.Join(r.Form["nick"]," ")
-	password := strings.Join(r.Form["password"]," ")
 
-	//TODO: add services url to config.conf.
-        Atheme, err = atheme.NewAtheme("http://127.0.0.1:8080/xmlrpc")
-	if err != nil {
-	        logOut(WARN, "%s", err)
+        // Check for Secure Cookie.
+        if cookie, err := r.Cookie(nsCookieName); err == nil {
+                value := make(map[string]string)
+                // try to decode it
+                if err = s.Decode(nsCookieName, cookie.Value, &value); err == nil {
+			authcookie = value["authcookie"]
+			account    = value["account"]
+			ipaddr     = value["ipaddr"]
+			logOut(DEBUG, "Retreived nsCookieName. authcookie: '%s' account: '%s' ipaddr: '%s'", value["authcookie"], value["account"], value["ipaddr"])
+                }
+        }
+	
+	// No valid authcookie, login required from form data.
+        if authcookie == "*" {
+	
+	        nick := r.PostFormValue("nick")
+	        password := r.PostFormValue("password")
+
+	        //TODO: add services url to config.conf.
+                Atheme, err = atheme.NewAtheme("http://127.0.0.1:8080/xmlrpc")
+	
+	        if err != nil {
+	                logOut(WARN, "%s", err)
+			return
+	        }
+	
+	        if Atheme == nil {
+	                logOut(WARN, "Atheme is nil")
+			return
+	        }
+	
+	        err = Atheme.Login(nick, password)
+	
+	        if err != nil {
+	                logOut(WARN, "Atheme error: %s", err.Error())
+			return
+	        }
+		
+	        // Valid auth.  Generate and store encoded cookie.
+	        if Atheme.Authcookie != "*" {
+			authcookie = Atheme.Authcookie
+			account    = Atheme.Account
+	                value := map[string]string{
+		                "authcookie": Atheme.Authcookie,
+		                "account": Atheme.Account,
+		                "ipaddr": ipaddr,
+		        }
+
+                        if encoded, err := s.Encode(nsCookieName, value); err == nil {
+		                cookie := &http.Cookie{
+			                Name:    nsCookieName,
+				        Value:   encoded,
+				        Domain:  ".beerbarian.com", //TODO: Needs config.conf setting.
+			        }
+			        logOut(DEBUG, "cookie ", cookie)
+			        http.SetCookie(w, cookie)
+				logOut(DEBUG, "Stored nsCookieName. authcookie: '%s', account: '%s' ipaddr: '%s'", Atheme.Authcookie, Atheme.Account, ipaddr)
+		        }
+	        }
 	}
-	if Atheme == nil {
-	        logOut(WARN, "Atheme is nil")
-	}
-	err = Atheme.Login(nick, password)
-	if err != nil {
-	        logOut(WARN, "Atheme error: %s", err.Error())
-	}
-	logOut(DEBUG, "Atheme.Authcookie: '%s', Atheme.Account: '%s'", Atheme.Authcookie, Atheme.Account)
+	
+	
 	out, _ := json.Marshal(map[string]interface{}{
-	        "command":	"login",
-		"authcookie":	Atheme.Authcookie,
-		"account":	Atheme.Account,
+		"authcookie":	authcookie,
+		"account":	account,
+		"ipaddr":	ipaddr,
 	})
+	
+
 	w.Write(out)
 }
 
