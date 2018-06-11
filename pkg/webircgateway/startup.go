@@ -79,6 +79,9 @@ func initHttpRoutes() error {
 		case "sockjs":
 			sockjsHTTPHandler(HttpRouter)
 			engineConfigured = true
+		case "ircservices":
+			ircservicesHTTPHandler(HttpRouter)
+			engineConfigured = true
 		default:
 			logOut(3, "Invalid server engine: '%s'", serverEngine)
 		}

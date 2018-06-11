@@ -57,6 +57,7 @@ webroot = www/
 websocket
 sockjs
 kiwiirc
+#ircservices
 
 # Websites (hostnames) that are allowed to connect here
 # No entries here will allow any website to connect.
