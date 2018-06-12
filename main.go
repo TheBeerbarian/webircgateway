@@ -9,7 +9,7 @@ import (
 	"syscall"
 
 	"github.com/kiwiirc/webircgateway/pkg/proxy"
-	"github.com/thebeerbarian/webircgateway/pkg/webircgateway"
+	"github.com/kiwiirc/webircgateway/pkg/webircgateway"
 )
 
 const VERSION = "0.3.3"

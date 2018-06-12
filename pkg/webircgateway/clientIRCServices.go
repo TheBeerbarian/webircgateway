@@ -6,7 +6,7 @@ import (
 	"net/http"
 
 	"github.com/gorilla/securecookie"
-	"github.com/thebeerbarian/webircgateway/pkg/ircservices"
+	"github.com/Xe/Tetra/atheme"
 )
 
 // Struct ircservices contains all fields for
