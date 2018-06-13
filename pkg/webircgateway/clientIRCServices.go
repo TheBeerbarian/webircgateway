@@ -127,25 +127,64 @@ func ircservicesCommand(w http.ResponseWriter, r *http.Request) {
 //   for their registration otherwise prompt for login.  Maybe have a config to enable/disable.
 
 func ircservicesRespond(w http.ResponseWriter, r *http.Request) {
+	var (
+	        //err error
+		authcookie = "*"
+		account    = ""
+		ipaddr     = r.Header.Get("X-Forwarded-For") //TODO: may not be proxied. Need fallback.
+	        s          = securecookie.New(nsCookieHashKey, nil)
+	)
 
-        var testpage string
+        if err := r.ParseForm(); err != nil {
+	        http.Error(w, "Error reading POST form data", http.StatusInternalServerError)
+		return
+	}
 
-        testpage = "<!DOCTYPE html>\n"
+        // Check for Secure Cookie.
+        if cookie, err := r.Cookie(nsCookieName); err == nil {
+                value := make(map[string]string)
+                // try to decode it
+                if err = s.Decode(nsCookieName, cookie.Value, &value); err == nil {
+			authcookie = value["authcookie"]
+			account    = value["account"]
+			ipaddr     = value["ipaddr"]
+			logOut(DEBUG, "Retreived nsCookieName. authcookie: '%s' account: '%s' ipaddr: '%s'", value["authcookie"], value["account"], value["ipaddr"])
+                }
+        }
+
+        logOut(DEBUG, "authcookie: '%s'", authcookie)
+	
+        switch authcookie {
+	case "*":
+
+        testpage := "<!DOCTYPE html>\n"
         testpage += "<html>\n"
         testpage += "  <head>\n"
         testpage += "    <title>IRC Services Test</title>\n"
         testpage += "  </head>\n"
+        testpage += "Missing or expired authcookie. Login required.<br><br>"
         testpage += "  <div style=\"margin: 0 auto;padding: 0;width: 800px;\"><body>\n"
         testpage += "    <h1 style=\"color: black; font-family: verdana; text-align: center;\">IRC Services Test</h1>\n"
         testpage += "    <form action=\"/webirc/ircservices/\" method=\"post\">\n"
         testpage += "    <div style=\"text-align: center;margin: 0 auto;\">\n"
         testpage += "      <label for=\"nick\">Nickname</label> <input type=\"text\" name=\"nick\">&nbsp;&nbsp;\n"
-        testpage += "      <label for=\"password\">Password</label> <input type=\"password\" name=\"password\"><br>\n"
+        testpage += "      <label for=\"password\">Password</label> <input type=\"password\" name=\"password\"><br><br>\n"
         testpage += "      <button type=\"Submit\" value=\"Submit\">Submit</button>\n"
         testpage += "    </div></form>\n"
         testpage += "  </body></div>\n"
         testpage += "</html>\n"
-       fmt.Fprint(w, testpage)
+        fmt.Fprint(w, testpage)
+	
+	default:
+	        out, _ := json.Marshal(map[string]interface{}{
+		        "authcookie":	authcookie,
+		        "account":	account,
+		        "ipaddr":	ipaddr,
+	        })
+	
+                fmt.Fprintln(w, "Authcookie found. No login required.\n")
+	        w.Write(out)
+	}
 
 }
 
