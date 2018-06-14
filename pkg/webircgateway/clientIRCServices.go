@@ -6,7 +6,7 @@ import (
 	"net/http"
 
 	"github.com/gorilla/securecookie"
-	"github.com/Xe/Tetra/atheme"
+	"github.com/thebeerbarian/atheme"
 )
 
 // Struct ircservices contains all fields for
@@ -38,7 +38,7 @@ func ircservicesHTTPHandler(router *http.ServeMux) {
 
 func ircservicesCommand(w http.ResponseWriter, r *http.Request) {
 	var (
-	        err error
+	        //err error
 		authcookie = "*"
 		account    = ""
 		ipaddr     = r.Header.Get("X-Forwarded-For") //TODO: may not be proxied. Need fallback.
@@ -69,7 +69,7 @@ func ircservicesCommand(w http.ResponseWriter, r *http.Request) {
 	        password := r.PostFormValue("password")
 
 	        //TODO: add services url to config.conf.
-                Atheme, err = atheme.NewAtheme("http://127.0.0.1:8080/xmlrpc")
+                Atheme, err := atheme.NewAtheme("http://127.0.0.1:8080/xmlrpc")
 	
 	        if err != nil {
 	                logOut(WARN, "%s", err)
@@ -82,8 +82,8 @@ func ircservicesCommand(w http.ResponseWriter, r *http.Request) {
 	        }
 	
 	        err = Atheme.Login(nick, password)
-	
-	        if err != nil {
+
+                if err != nil {
 	                logOut(WARN, "Atheme error: %s", err.Error())
 			return
 	        }
@@ -109,6 +109,39 @@ func ircservicesCommand(w http.ResponseWriter, r *http.Request) {
 				logOut(DEBUG, "Stored nsCookieName. authcookie: '%s', account: '%s' ipaddr: '%s'", Atheme.Authcookie, Atheme.Account, ipaddr)
 		        }
 	        }
+	} else {
+
+	        //TODO: add services url to config.conf.
+                Atheme, err := atheme.NewAtheme("http://127.0.0.1:8080/xmlrpc")
+	
+	        if err != nil {
+	                logOut(WARN, "%s", err)
+			return
+	        }
+	
+	        if Atheme == nil {
+	                logOut(WARN, "Atheme is nil")
+			return
+	        }
+	
+		command := r.PostFormValue("command")
+		Atheme.Authcookie = authcookie
+		Atheme.Account = account
+		//Atheme.ipaddr = ipaddr
+                logOut(DEBUG, "Atheme Command: %s", command)
+		args := []string{authcookie, account, ipaddr, command}
+//		args := []string{command}
+                logOut(DEBUG, "Atheme Command: %s", args)
+		//var result map[string]string
+                result, err := Atheme.NickServ.Info(command)
+
+                if err != nil {
+	                logOut(WARN, "Atheme error: %s", err.Error())
+			return
+	        }
+
+	        fmt.Fprint(w, result, "\n")			
+		
 	}
 	
 	
@@ -157,31 +190,47 @@ func ircservicesRespond(w http.ResponseWriter, r *http.Request) {
         switch authcookie {
 	case "*":
 
-        testpage := "<!DOCTYPE html>\n"
-        testpage += "<html>\n"
-        testpage += "  <head>\n"
-        testpage += "    <title>IRC Services Test</title>\n"
-        testpage += "  </head>\n"
-        testpage += "Missing or expired authcookie. Login required.<br><br>"
-        testpage += "  <div style=\"margin: 0 auto;padding: 0;width: 800px;\"><body>\n"
-        testpage += "    <h1 style=\"color: black; font-family: verdana; text-align: center;\">IRC Services Test</h1>\n"
-        testpage += "    <form action=\"/webirc/ircservices/\" method=\"post\">\n"
-        testpage += "    <div style=\"text-align: center;margin: 0 auto;\">\n"
-        testpage += "      <label for=\"nick\">Nickname</label> <input type=\"text\" name=\"nick\">&nbsp;&nbsp;\n"
-        testpage += "      <label for=\"password\">Password</label> <input type=\"password\" name=\"password\"><br><br>\n"
-        testpage += "      <button type=\"Submit\" value=\"Submit\">Submit</button>\n"
-        testpage += "    </div></form>\n"
-        testpage += "  </body></div>\n"
-        testpage += "</html>\n"
-        fmt.Fprint(w, testpage)
+	        testpage := "<!DOCTYPE html>\n"
+	        testpage += "<html>\n"
+	        testpage += "  <head>\n"
+	        testpage += "    <title>IRC Services Test</title>\n"
+	        testpage += "  </head>\n"
+	        testpage += "Missing or expired authcookie. Login required.<br><br>"
+	        testpage += "  <div style=\"margin: 0 auto;padding: 0;width: 800px;\"><body>\n"
+	        testpage += "    <h1 style=\"color: black; font-family: verdana; text-align: center;\">IRC Services Test</h1>\n"
+	        testpage += "    <form action=\"/webirc/ircservices/\" method=\"post\">\n"
+	        testpage += "    <div style=\"text-align: center;margin: 0 auto;\">\n"
+	        testpage += "      <label for=\"nick\">Nickname</label> <input type=\"text\" name=\"nick\">&nbsp;&nbsp;\n"
+	        testpage += "      <label for=\"password\">Password</label> <input type=\"password\" name=\"password\"><br><br>\n"
+	        testpage += "      <button type=\"Submit\" value=\"Submit\">Submit</button>\n"
+	        testpage += "    </div></form>\n"
+	        testpage += "  </body></div>\n"
+	        testpage += "</html>\n"
+	        fmt.Fprint(w, testpage)
 	
 	default:
-	        out, _ := json.Marshal(map[string]interface{}{
-		        "authcookie":	authcookie,
-		        "account":	account,
-		        "ipaddr":	ipaddr,
-	        })
 	
+		out, _ := json.Marshal(map[string]interface{}{
+			"authcookie":	authcookie,
+			"account":	account,
+			"ipaddr":	ipaddr,
+		})
+	
+                testpage := "<!DOCTYPE html>\n"
+                testpage += "<html>\n"
+                testpage += "  <head>\n"
+                testpage += "    <title>IRC Services Test</title>\n"
+                testpage += "  </head>\n"
+                testpage += "  <div style=\"margin: 0 auto;padding: 0;width: 800px;\"><body>\n"
+                testpage += "    <h1 style=\"color: black; font-family: verdana; text-align: center;\">IRC Services Test</h1>\n"
+                testpage += "    <form action=\"/webirc/ircservices/\" method=\"post\">\n"
+                testpage += "    <div style=\"text-align: center;margin: 0 auto;\">\n"
+                testpage += "      <label for=\"command\">NickServ INFO for</label> <input type=\"text\" name=\"command\"><br><br>\n"
+                testpage += "      <button type=\"Submit\" value=\"Submit\">Submit</button>\n"
+                testpage += "    </div></form>\n"
+                testpage += "  </body></div>\n"
+                testpage += "</html>\n"
+                fmt.Fprint(w, testpage)
                 fmt.Fprintln(w, "Authcookie found. No login required.\n")
 	        w.Write(out)
 	}
